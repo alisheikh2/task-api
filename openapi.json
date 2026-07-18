@@ -33,20 +33,47 @@
     },
     "/tasks": {
       "get": {
-        "summary": "List all tasks",
+        "summary": "List tasks with optional filtering, search, and pagination",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "done",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Filter by completion status"
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search titles case-insensitively"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Maximum number of tasks to return"
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "description": "Number of matching tasks to skip"
+          }
+        ],
         "responses": {
           "200": {
-            "description": "A list of tasks",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Task"
-                  }
-                }
-              }
-            }
+            "description": "A list of tasks"
           }
         }
       },
@@ -58,23 +85,13 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/NewTask"
-              },
-              "example": {
-                "title": "Buy milk"
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": "Task created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Task"
-                }
-              }
-            }
+            "description": "Task created"
           },
           "400": {
             "description": "Title is missing or empty"
@@ -83,29 +100,16 @@
       }
     },
     "/tasks/{id}": {
-      "parameters": [
-        {
-          "name": "id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "integer"
-          },
-          "description": "Task id"
-        }
-      ],
       "get": {
         "summary": "Get one task",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TaskId"
+          }
+        ],
         "responses": {
           "200": {
-            "description": "The requested task",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Task"
-                }
-              }
-            }
+            "description": "The requested task"
           },
           "404": {
             "description": "Task not found"
@@ -114,30 +118,24 @@
       },
       "put": {
         "summary": "Update a task",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TaskId"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/TaskUpdate"
-              },
-              "example": {
-                "title": "Buy oat milk",
-                "done": true
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Task updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Task"
-                }
-              }
-            }
+            "description": "Task updated"
           },
           "400": {
             "description": "Empty or invalid body"
@@ -149,6 +147,11 @@
       },
       "delete": {
         "summary": "Delete a task",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TaskId"
+          }
+        ],
         "responses": {
           "204": {
             "description": "Task deleted"
@@ -158,13 +161,50 @@
           }
         }
       }
+    },
+    "/stats": {
+      "get": {
+        "summary": "Get task statistics",
+        "responses": {
+          "200": {
+            "description": "Total",
+            "done": null,
+            "and open task counts": null
+          }
+        }
+      }
+    },
+    "/reset": {
+      "post": {
+        "summary": "Restore the three sample tasks",
+        "responses": {
+          "200": {
+            "description": "Tasks restored"
+          }
+        }
+      }
     }
   },
   "components": {
+    "parameters": {
+      "TaskId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Task id"
+      }
+    },
     "schemas": {
       "Task": {
         "type": "object",
-        "required": ["id", "title", "done"],
+        "required": [
+          "id",
+          "title",
+          "done"
+        ],
         "properties": {
           "id": {
             "type": "integer",
@@ -182,7 +222,9 @@
       },
       "NewTask": {
         "type": "object",
-        "required": ["title"],
+        "required": [
+          "title"
+        ],
         "properties": {
           "title": {
             "type": "string",
@@ -204,5 +246,6 @@
         }
       }
     }
-  }
+  },
+  "tags": []
 }
