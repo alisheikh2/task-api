@@ -4,8 +4,8 @@ A beginner-friendly CRUD API built for the FlyRank Backend Internship Week 2 ass
 
 ## Requirements
 
-- Node.js 18 or newer
-- npm
+* Node.js 18 or newer
+* npm
 
 ## Installation
 
@@ -23,25 +23,25 @@ The hand-built API runs at `http://localhost:3000`.
 
 ## Endpoints
 
-| Method | Endpoint | Description | Success | Errors |
-| --- | --- | --- | --- | --- |
-| GET | `/` | API information | 200 | — |
-| GET | `/health` | Health check | 200 | — |
-| GET | `/tasks` | List all tasks | 200 | — |
-| GET | `/tasks/:id` | Get one task | 200 | 404 |
-| POST | `/tasks` | Create a task | 201 | 400 |
-| PUT | `/tasks/:id` | Update a task title and/or completion status | 200 | 400, 404 |
-| DELETE | `/tasks/:id` | Delete a task | 204 | 404 |
-| GET | `/stats` | Return total, done, and open counts | 200 | — |
-| POST | `/reset` | Restore the three sample tasks | 200 | — |
-| GET | `/docs` | Interactive Swagger UI documentation | 200 | — |
+|Method|Endpoint|Description|Success|Errors|
+|-|-|-|-|-|
+|GET|`/`|API information|200|—|
+|GET|`/health`|Health check|200|—|
+|GET|`/tasks`|List all tasks|200|—|
+|GET|`/tasks/:id`|Get one task|200|404|
+|POST|`/tasks`|Create a task|201|400|
+|PUT|`/tasks/:id`|Update a task title and/or completion status|200|400, 404|
+|DELETE|`/tasks/:id`|Delete a task|204|404|
+|GET|`/stats`|Return total, done, and open counts|200|—|
+|POST|`/reset`|Restore the three sample tasks|200|—|
+|GET|`/docs`|Interactive Swagger UI documentation|200|—|
 
 ## Optional query parameters
 
-- `GET /tasks?done=true` returns only completed tasks. Use `done=false` for open tasks.
-- `GET /tasks?search=milk` searches task titles case-insensitively.
-- `GET /tasks?limit=2&offset=2` returns a page of matching tasks.
-- Filtering, search, and pagination can be combined.
+* `GET /tasks?done=true` returns only completed tasks. Use `done=false` for open tasks.
+* `GET /tasks?search=milk` searches task titles case-insensitively.
+* `GET /tasks?limit=2\&offset=2` returns a page of matching tasks.
+* Filtering, search, and pagination can be combined.
 
 ## Example curl requests
 
@@ -54,8 +54,8 @@ curl -i http://localhost:3000/tasks
 Create a task:
 
 ```bash
-curl -i -X POST http://localhost:3000/tasks \
-  -H "Content-Type: application/json" \
+curl -i -X POST http://localhost:3000/tasks \\
+  -H "Content-Type: application/json" \\
   -d '{"title":"Buy milk"}'
 ```
 
@@ -71,7 +71,7 @@ Content-Type: application/json; charset=utf-8
 Filter, search, and paginate:
 
 ```bash
-curl -i "http://localhost:3000/tasks?done=false&search=express&limit=2&offset=0"
+curl -i "http://localhost:3000/tasks?done=false\&search=express\&limit=2\&offset=0"
 ```
 
 Get statistics and reset the in-memory data:
@@ -84,8 +84,8 @@ curl -i -X POST http://localhost:3000/reset
 Update a task:
 
 ```bash
-curl -i -X PUT http://localhost:3000/tasks/4 \
-  -H "Content-Type: application/json" \
+curl -i -X PUT http://localhost:3000/tasks/4 \\
+  -H "Content-Type: application/json" \\
   -d '{"done":true}'
 ```
 
@@ -101,7 +101,7 @@ Open [http://localhost:3000/docs](http://localhost:3000/docs) while the server i
 
 The OpenAPI document is generated from the route comments with `swagger-jsdoc` when the server starts and is served through `swagger-ui-express`. The generated document is also saved as `openapi.json`.
 
-![Swagger UI](screenshots/swagger.png)
+!\[Swagger UI](screenshots/swagger.png)
 
 ## Mortality experiment
 
@@ -111,7 +111,7 @@ The tasks are stored only in memory, so creating a task and restarting the serve
 
 ### Prompt used
 
-> Build a beginner-friendly JavaScript Node.js API using Express.js only. Use port 3001 and an in-memory array with three sample tasks containing numeric id, string title, and boolean done fields. Implement GET /, GET /health, GET /tasks, GET /tasks/:id, POST /tasks, PUT /tasks/:id, and DELETE /tasks/:id. POST must require a non-empty title, assign the next id, set done to false, and return 201. PUT must allow title and/or done updates, reject an empty or invalid body with 400, and return 404 for an unknown id. DELETE must return 204 with no body and 404 for an unknown id. Return JSON errors and keep the code beginner-friendly with no database, authentication, TypeScript, ORM, or unnecessary folders.
+> Build a beginner-friendly JavaScript Node.js API using Express.js only. Use port 3001 and an in-memory array with three sample tasks containing numeric id, string title, and boolean done fields. Implement GET /, GET /health, GET /tasks, GET /tasks/:id, POST /tasks, PUT /tasks/:id, and DELETE /tasks/:id. POST must require a non-empty title, assign the next id, set done to false, and return 201. PUT must allow title and/or done updates, reject an empty or invalid body with 400, and return 404 for an unknown id. DELETE must return 204 with no body and 404 for an unknown id. Return JSON errors and keep the code beginner-friendly with no database, authentication, TypeScript, ORM, or unnecessary folders. Also include Swagger UI at /docs using swagger-ui-express and document the API with an OpenAPI file.
 
 ### Three concrete differences found
 
@@ -142,9 +142,10 @@ task-api/
 
 ## Validation and status codes
 
-- New tasks require a non-empty `title`; invalid input returns `400`.
-- Updates must include `title` and/or `done`; empty or invalid input returns `400`.
-- Unknown task ids return `404` with a JSON error.
-- Successful reads and updates return `200`.
-- Successful creation returns `201`.
-- Successful deletion returns `204` with no response body.
+* New tasks require a non-empty `title`; invalid input returns `400`.
+* Updates must include `title` and/or `done`; empty or invalid input returns `400`.
+* Unknown task ids return `404` with a JSON error.
+* Successful reads and updates return `200`.
+* Successful creation returns `201`.
+* Successful deletion returns `204` with no response body.
+
