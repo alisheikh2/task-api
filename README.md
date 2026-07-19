@@ -101,7 +101,7 @@ Open [http://localhost:3000/docs](http://localhost:3000/docs) while the server i
 
 The OpenAPI document is generated from the route comments with `swagger-jsdoc` when the server starts and is served through `swagger-ui-express`. The generated document is also saved as `openapi.json`.
 
-!\[Swagger UI](screenshots/swagger.png)
+![Swagger UI](screenshots/swagger.png)
 
 ## Mortality experiment
 
