@@ -236,13 +236,10 @@ app.post('/tasks', (req, res) => {
     return res.status(400).json({ error: 'Title cannot be empty' });
   }
 
-  const nextId = tasks.length === 0
-    ? 1
-    : Math.max(...tasks.map((task) => task.id)) + 1;
-  const newTask = { id: nextId, title, done: false };
+  const result = db.prepare('INSERT INTO tasks (title, done) VALUES (?, 0)').run(title);
+  const newTask = findTaskRow(result.lastInsertRowid);
 
-  tasks.push(newTask);
-  res.status(201).json(newTask);
+  res.status(201).json(toApiTask(newTask));
 });
 
 app.put('/tasks/:id', (req, res) => {
