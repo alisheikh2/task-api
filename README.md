@@ -2,6 +2,13 @@
 
 A beginner-friendly CRUD API built for the FlyRank Backend Internship. It started as an in-memory list of tasks (Week 2) and now persists tasks in a SQLite database (Week 3, Assignment A2), while keeping the exact same endpoints and responses.
 
+## Database (Week 3 update)
+
+- **Why SQLite:** it's a single-file, zero-setup database — no server to install or run, perfect for a small CRUD API like this one, and an easy stepping stone toward Postgres/MySQL later.
+- **Where the database lives:** `tasks.db` in the project root. It's created automatically the first time the server starts (see `db.js`), and it's git-ignored so every clone starts fresh.
+- **How to start the project:** `npm install` then `npm start` (same as before) — the `tasks` table and the three seed tasks are created automatically if the file or table doesn't exist yet.
+- **Screenshot:** add a screenshot of `tasks.db` open in DB Browser for SQLite to `screenshots/db-browser.png` and reference it here, e.g. `![DB Browser](screenshots/db-browser.png)`.
+
 ## Exploring the database by hand (Stage 4)
 
 Opened `tasks.db` in DB Browser for SQLite and ran a few queries directly against it — the same file the API reads and writes.
