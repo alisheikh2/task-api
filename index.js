@@ -3,6 +3,12 @@ const fs = require('fs');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
+// Opens (and creates if missing) tasks.db, creates the tasks table if it
+// doesn't exist, and seeds three example tasks only if the table is empty.
+// Routes still use the in-memory array for now — this stage only sets up
+// the database itself.
+require('./db');
+
 const app = express();
 const PORT = 3000;
 
