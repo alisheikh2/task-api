@@ -1,6 +1,18 @@
 # Task API
 
-A beginner-friendly CRUD API built for the FlyRank Backend Internship Week 2 assignment. It manages an in-memory list of tasks with Express.js. Data is intentionally reset whenever the server restarts; no database is used.
+A beginner-friendly CRUD API built for the FlyRank Backend Internship. It started as an in-memory list of tasks (Week 2) and now persists tasks in a SQLite database (Week 3, Assignment A2), while keeping the exact same endpoints and responses.
+
+## Exploring the database by hand (Stage 4)
+
+Opened `tasks.db` in DB Browser for SQLite and ran a few queries directly against it — the same file the API reads and writes.
+
+Example query:
+
+```sql
+SELECT * FROM tasks WHERE done = 1;
+```
+
+This returned the seeded "Read the assignment" task. Hitting `GET /tasks?done=true` through the running API returned the exact same row, with no server restart needed — confirming the API and DB Browser are reading the same live file, not separate copies of the data.
 
 ## Requirements
 
