@@ -12,22 +12,14 @@ const PORT = 3000;
 
 app.use(express.json());
 
-// POST/PUT/DELETE still use this in-memory array for now — only the read
-// endpoints below have been migrated to the database in this stage.
+// Sample tasks used only by POST /reset to restore the original three tasks.
 const sampleTasks = [
-  { id: 1, title: 'Learn Express', done: false },
-  { id: 2, title: 'Build a CRUD API', done: false },
-  { id: 3, title: 'Read the assignment', done: true }
+  { id: 1, title: 'Learn Express', done: 0 },
+  { id: 2, title: 'Build a CRUD API', done: 0 },
+  { id: 3, title: 'Read the assignment', done: 1 }
 ];
 
-const tasks = sampleTasks.map((task) => ({ ...task }));
-
 function findTask(taskId) {
-  return tasks.find((task) => task.id === Number(taskId));
-}
-
-// Database-backed lookup + shaping, used by the migrated GET endpoints.
-function findTaskRow(taskId) {
   return db.prepare('SELECT * FROM tasks WHERE id = ?').get(Number(taskId));
 }
 
@@ -157,7 +149,7 @@ const swaggerOptions = {
     info: {
       title: 'Task API',
       version: '1.0',
-      description: 'A simple in-memory CRUD API for managing tasks.'
+      description: 'A SQLite-backed CRUD API for managing tasks.'
     },
     servers: [{ url: 'http://localhost:3000' }]
   },
@@ -216,7 +208,7 @@ app.get('/tasks', (req, res) => {
 });
 
 app.get('/tasks/:id', (req, res) => {
-  const task = findTaskRow(req.params.id);
+  const task = findTask(req.params.id);
 
   if (!task) {
     return notFoundResponse(res, req.params.id);
@@ -237,7 +229,7 @@ app.post('/tasks', (req, res) => {
   }
 
   const result = db.prepare('INSERT INTO tasks (title, done) VALUES (?, 0)').run(title);
-  const newTask = findTaskRow(result.lastInsertRowid);
+  const newTask = findTask(result.lastInsertRowid);
 
   res.status(201).json(toApiTask(newTask));
 });
@@ -270,31 +262,41 @@ app.put('/tasks/:id', (req, res) => {
     return res.status(400).json({ error: 'Done must be a boolean' });
   }
 
-  if (hasTitle) task.title = updates.title;
-  if (hasDone) task.done = updates.done;
+  const nextTitle = hasTitle ? updates.title : task.title;
+  const nextDone = hasDone ? (updates.done ? 1 : 0) : task.done;
 
-  res.json(task);
+  db.prepare('UPDATE tasks SET title = ?, done = ? WHERE id = ?').run(nextTitle, nextDone, task.id);
+
+  res.json(toApiTask(findTask(task.id)));
 });
 
 app.delete('/tasks/:id', (req, res) => {
-  const taskIndex = tasks.findIndex((task) => task.id === Number(req.params.id));
+  const task = findTask(req.params.id);
 
-  if (taskIndex === -1) {
+  if (!task) {
     return notFoundResponse(res, req.params.id);
   }
 
-  tasks.splice(taskIndex, 1);
+  db.prepare('DELETE FROM tasks WHERE id = ?').run(task.id);
   res.status(204).send();
 });
 
 app.get('/stats', (req, res) => {
-  const done = tasks.filter((task) => task.done).length;
-  res.json({ total: tasks.length, done, open: tasks.length - done });
+  const { total } = db.prepare('SELECT COUNT(*) AS total FROM tasks').get();
+  const { done } = db.prepare('SELECT COUNT(*) AS done FROM tasks WHERE done = 1').get();
+
+  res.json({ total, done, open: total - done });
 });
 
 app.post('/reset', (req, res) => {
-  tasks.splice(0, tasks.length, ...sampleTasks.map((task) => ({ ...task })));
-  res.json(tasks);
+  const resetAll = db.transaction(() => {
+    db.prepare('DELETE FROM tasks').run();
+    const insert = db.prepare('INSERT INTO tasks (id, title, done) VALUES (?, ?, ?)');
+    sampleTasks.forEach((task) => insert.run(task.id, task.title, task.done));
+  });
+
+  resetAll();
+  res.json(db.prepare('SELECT * FROM tasks ORDER BY id').all().map(toApiTask));
 });
 
 app.listen(PORT, () => {
