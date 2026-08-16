@@ -5,15 +5,15 @@ const swaggerUi = require('swagger-ui-express');
 
 // Opens (and creates if missing) tasks.db, creates the tasks table if it
 // doesn't exist, and seeds three example tasks only if the table is empty.
-// Routes still use the in-memory array for now — this stage only sets up
-// the database itself.
-require('./db');
+const { db } = require('./db');
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
 
+// POST/PUT/DELETE still use this in-memory array for now — only the read
+// endpoints below have been migrated to the database in this stage.
 const sampleTasks = [
   { id: 1, title: 'Learn Express', done: false },
   { id: 2, title: 'Build a CRUD API', done: false },
@@ -24,6 +24,15 @@ const tasks = sampleTasks.map((task) => ({ ...task }));
 
 function findTask(taskId) {
   return tasks.find((task) => task.id === Number(taskId));
+}
+
+// Database-backed lookup + shaping, used by the migrated GET endpoints.
+function findTaskRow(taskId) {
+  return db.prepare('SELECT * FROM tasks WHERE id = ?').get(Number(taskId));
+}
+
+function toApiTask(row) {
+  return { id: row.id, title: row.title, done: Boolean(row.done) };
 }
 
 function notFoundResponse(res, taskId) {
@@ -172,36 +181,48 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/tasks', (req, res) => {
-  let matchingTasks = [...tasks];
+  const clauses = [];
+  const params = [];
 
   if (req.query.done !== undefined) {
-    matchingTasks = matchingTasks.filter(
-      (task) => task.done === (req.query.done === 'true')
-    );
+    clauses.push('done = ?');
+    params.push(req.query.done === 'true' ? 1 : 0);
   }
 
   if (req.query.search) {
-    const searchText = req.query.search.toLowerCase();
-    matchingTasks = matchingTasks.filter((task) =>
-      task.title.toLowerCase().includes(searchText)
-    );
+    clauses.push('title LIKE ? COLLATE NOCASE');
+    params.push(`%${req.query.search}%`);
   }
+
+  let sql = 'SELECT * FROM tasks';
+  if (clauses.length > 0) {
+    sql += ` WHERE ${clauses.join(' AND ')}`;
+  }
+  sql += ' ORDER BY id';
 
   const offset = Number.parseInt(req.query.offset, 10) || 0;
   const limit = Number.parseInt(req.query.limit, 10);
-  matchingTasks = matchingTasks.slice(offset, limit >= 0 ? offset + limit : undefined);
 
-  res.json(matchingTasks);
+  if (limit >= 0) {
+    sql += ' LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+  } else if (offset > 0) {
+    sql += ' LIMIT -1 OFFSET ?';
+    params.push(offset);
+  }
+
+  const rows = db.prepare(sql).all(...params);
+  res.json(rows.map(toApiTask));
 });
 
 app.get('/tasks/:id', (req, res) => {
-  const task = findTask(req.params.id);
+  const task = findTaskRow(req.params.id);
 
   if (!task) {
     return notFoundResponse(res, req.params.id);
   }
 
-  res.json(task);
+  res.json(toApiTask(task));
 });
 
 app.post('/tasks', (req, res) => {
