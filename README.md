@@ -7,7 +7,7 @@ A beginner-friendly CRUD API built for the FlyRank Backend Internship. It starte
 - **Why SQLite:** it's a single-file, zero-setup database — no server to install or run, perfect for a small CRUD API like this one, and an easy stepping stone toward Postgres/MySQL later.
 - **Where the database lives:** `tasks.db` in the project root. It's created automatically the first time the server starts (see `db.js`), and it's git-ignored so every clone starts fresh.
 - **How to start the project:** `npm install` then `npm start` (same as before) — the `tasks` table and the three seed tasks are created automatically if the file or table doesn't exist yet.
-- **Screenshot:** add a screenshot of `tasks.db` open in DB Browser for SQLite to `screenshots/db-browser.png` and reference it here, e.g. `![DB Browser](screenshots/db-browser.png)`.
+- **Screenshot:** add a screenshot of `tasks.db` open in DB Browser for SQLite to `screenshots/db-browser.png` and reference it here, e.g. `[DB Browser](screenshots/db-browser.png)`.
 
 ## Exploring the database by hand (Stage 4)
 
