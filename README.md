@@ -2,6 +2,17 @@
 
 A beginner-friendly CRUD API built for the FlyRank Backend Internship. It started as an in-memory list of tasks (Week 2) and now persists tasks in a SQLite database (Week 3, Assignment A2), while keeping the exact same endpoints and responses.
 
+## Database (Week 1 A3 update — Postgres in Docker)
+
+- **Start a real database server:**
+  ```bash
+  docker run --name taskdb -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=tasks \
+    -p 5432:5432 -v taskdata:/var/lib/postgresql/data -d postgres
+  ```
+  This runs the official `postgres` image, names the container `taskdb`, sets a password and a `tasks` database, maps port 5432 to the host, and mounts a named volume (`taskdata`) so the data survives even if the container is removed and recreated.
+- **Look inside it:** `docker ps` to confirm it's running, then `docker exec -it taskdb psql -U postgres -d tasks` opens a `psql` prompt inside the container (`\dt` lists tables, `\q` quits).
+- **Secrets:** the connection string lives in a git-ignored `.env` file. `.env.example` is committed with the same keys and placeholder values so anyone cloning the repo knows what to set.
+
 ## Database (Week 3 update)
 
 - **Why SQLite:** it's a single-file, zero-setup database — no server to install or run, perfect for a small CRUD API like this one, and an easy stepping stone toward Postgres/MySQL later.
