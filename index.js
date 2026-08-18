@@ -23,12 +23,14 @@ const sampleTasks = [
   { id: 3, title: 'Read the assignment', done: 1 }
 ];
 
-function findTask(taskId) {
-  return db.prepare('SELECT * FROM tasks WHERE id = ?').get(Number(taskId));
+// Database-backed lookup + shaping, used by the migrated GET endpoints.
+async function findTaskRow(taskId) {
+  const { rows } = await repo.pool.query('SELECT * FROM tasks WHERE id = $1', [Number(taskId)]);
+  return rows[0];
 }
 
 function toApiTask(row) {
-  return { id: row.id, title: row.title, done: Boolean(row.done) };
+  return { id: row.id, title: row.title, done: row.done };
 }
 
 function notFoundResponse(res, taskId) {
@@ -176,49 +178,59 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.get('/tasks', (req, res) => {
-  const clauses = [];
-  const params = [];
+app.get('/tasks', async (req, res, next) => {
+  try {
+    const clauses = [];
+    const params = [];
 
-  if (req.query.done !== undefined) {
-    clauses.push('done = ?');
-    params.push(req.query.done === 'true' ? 1 : 0);
+    if (req.query.done !== undefined) {
+      params.push(req.query.done === 'true');
+      clauses.push(`done = $${params.length}`);
+    }
+
+    if (req.query.search) {
+      params.push(`%${req.query.search}%`);
+      clauses.push(`title ILIKE $${params.length}`);
+    }
+
+    let sql = 'SELECT * FROM tasks';
+    if (clauses.length > 0) {
+      sql += ` WHERE ${clauses.join(' AND ')}`;
+    }
+    sql += ' ORDER BY id';
+
+    const offset = Number.parseInt(req.query.offset, 10) || 0;
+    const limit = Number.parseInt(req.query.limit, 10);
+
+    if (limit >= 0) {
+      params.push(limit);
+      sql += ` LIMIT $${params.length}`;
+      params.push(offset);
+      sql += ` OFFSET $${params.length}`;
+    } else if (offset > 0) {
+      params.push(offset);
+      sql += ` OFFSET $${params.length}`;
+    }
+
+    const { rows } = await repo.pool.query(sql, params);
+    res.json(rows.map(toApiTask));
+  } catch (err) {
+    next(err);
   }
-
-  if (req.query.search) {
-    clauses.push('title LIKE ? COLLATE NOCASE');
-    params.push(`%${req.query.search}%`);
-  }
-
-  let sql = 'SELECT * FROM tasks';
-  if (clauses.length > 0) {
-    sql += ` WHERE ${clauses.join(' AND ')}`;
-  }
-  sql += ' ORDER BY id';
-
-  const offset = Number.parseInt(req.query.offset, 10) || 0;
-  const limit = Number.parseInt(req.query.limit, 10);
-
-  if (limit >= 0) {
-    sql += ' LIMIT ? OFFSET ?';
-    params.push(limit, offset);
-  } else if (offset > 0) {
-    sql += ' LIMIT -1 OFFSET ?';
-    params.push(offset);
-  }
-
-  const rows = db.prepare(sql).all(...params);
-  res.json(rows.map(toApiTask));
 });
 
-app.get('/tasks/:id', (req, res) => {
-  const task = findTask(req.params.id);
+app.get('/tasks/:id', async (req, res, next) => {
+  try {
+    const task = await findTaskRow(req.params.id);
 
-  if (!task) {
-    return notFoundResponse(res, req.params.id);
+    if (!task) {
+      return notFoundResponse(res, req.params.id);
+    }
+
+    res.json(toApiTask(task));
+  } catch (err) {
+    next(err);
   }
-
-  res.json(toApiTask(task));
 });
 
 app.post('/tasks', (req, res) => {
@@ -313,3 +325,9 @@ repo.init()
     console.error('Failed to initialize the database', err);
     process.exit(1);
   });
+
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: 'Internal server error' });
+});
