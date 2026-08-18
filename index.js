@@ -18,9 +18,9 @@ app.use(express.json());
 
 // Sample tasks used only by POST /reset to restore the original three tasks.
 const sampleTasks = [
-  { id: 1, title: 'Learn Express', done: 0 },
-  { id: 2, title: 'Build a CRUD API', done: 0 },
-  { id: 3, title: 'Read the assignment', done: 1 }
+  { title: 'Learn Express', done: false },
+  { title: 'Build a CRUD API', done: false },
+  { title: 'Read the assignment', done: true }
 ];
 
 // Database-backed lookup + shaping, used by the migrated GET endpoints.
@@ -155,7 +155,7 @@ const swaggerOptions = {
     info: {
       title: 'Task API',
       version: '1.0',
-      description: 'A SQLite-backed CRUD API for managing tasks.'
+      description: 'A Postgres-backed CRUD API for managing tasks.'
     },
     servers: [{ url: 'http://localhost:3000' }]
   },
@@ -174,8 +174,13 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+app.get('/health', async (req, res) => {
+  try {
+    await repo.ping();
+    res.json({ status: 'ok', db: 'ok' });
+  } catch (err) {
+    res.status(503).json({ status: 'ok', db: 'error' });
+  }
 });
 
 app.get('/tasks', async (req, res, next) => {
@@ -233,86 +238,126 @@ app.get('/tasks/:id', async (req, res, next) => {
   }
 });
 
-app.post('/tasks', (req, res) => {
-  const { title } = req.body;
+app.post('/tasks', async (req, res, next) => {
+  try {
+    const { title } = req.body;
 
-  if (typeof title !== 'string') {
-    return res.status(400).json({ error: 'Title is required' });
+    if (typeof title !== 'string') {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    if (title.trim() === '') {
+      return res.status(400).json({ error: 'Title cannot be empty' });
+    }
+
+    const { rows } = await repo.pool.query(
+      'INSERT INTO tasks (title, done) VALUES ($1, false) RETURNING *',
+      [title]
+    );
+
+    res.status(201).json(toApiTask(rows[0]));
+  } catch (err) {
+    next(err);
   }
-
-  if (title.trim() === '') {
-    return res.status(400).json({ error: 'Title cannot be empty' });
-  }
-
-  const result = db.prepare('INSERT INTO tasks (title, done) VALUES (?, 0)').run(title);
-  const newTask = findTask(result.lastInsertRowid);
-
-  res.status(201).json(toApiTask(newTask));
 });
 
-app.put('/tasks/:id', (req, res) => {
-  const task = findTask(req.params.id);
+app.put('/tasks/:id', async (req, res, next) => {
+  try {
+    const task = await findTaskRow(req.params.id);
 
-  if (!task) {
-    return notFoundResponse(res, req.params.id);
+    if (!task) {
+      return notFoundResponse(res, req.params.id);
+    }
+
+    const updates = req.body;
+
+    if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
+      return res.status(400).json({ error: 'Request body must include title or done' });
+    }
+
+    const hasTitle = Object.prototype.hasOwnProperty.call(updates, 'title');
+    const hasDone = Object.prototype.hasOwnProperty.call(updates, 'done');
+
+    if (!hasTitle && !hasDone) {
+      return res.status(400).json({ error: 'Request body must include title or done' });
+    }
+
+    if (hasTitle && (typeof updates.title !== 'string' || updates.title.trim() === '')) {
+      return res.status(400).json({ error: 'Title must be a non-empty string' });
+    }
+
+    if (hasDone && typeof updates.done !== 'boolean') {
+      return res.status(400).json({ error: 'Done must be a boolean' });
+    }
+
+    const nextTitle = hasTitle ? updates.title : task.title;
+    const nextDone = hasDone ? updates.done : task.done;
+
+    const { rows } = await repo.pool.query(
+      'UPDATE tasks SET title = $1, done = $2 WHERE id = $3 RETURNING *',
+      [nextTitle, nextDone, task.id]
+    );
+
+    res.json(toApiTask(rows[0]));
+  } catch (err) {
+    next(err);
   }
-
-  const updates = req.body;
-
-  if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
-    return res.status(400).json({ error: 'Request body must include title or done' });
-  }
-
-  const hasTitle = Object.prototype.hasOwnProperty.call(updates, 'title');
-  const hasDone = Object.prototype.hasOwnProperty.call(updates, 'done');
-
-  if (!hasTitle && !hasDone) {
-    return res.status(400).json({ error: 'Request body must include title or done' });
-  }
-
-  if (hasTitle && (typeof updates.title !== 'string' || updates.title.trim() === '')) {
-    return res.status(400).json({ error: 'Title must be a non-empty string' });
-  }
-
-  if (hasDone && typeof updates.done !== 'boolean') {
-    return res.status(400).json({ error: 'Done must be a boolean' });
-  }
-
-  const nextTitle = hasTitle ? updates.title : task.title;
-  const nextDone = hasDone ? (updates.done ? 1 : 0) : task.done;
-
-  db.prepare('UPDATE tasks SET title = ?, done = ? WHERE id = ?').run(nextTitle, nextDone, task.id);
-
-  res.json(toApiTask(findTask(task.id)));
 });
 
-app.delete('/tasks/:id', (req, res) => {
-  const task = findTask(req.params.id);
+app.delete('/tasks/:id', async (req, res, next) => {
+  try {
+    const task = await findTaskRow(req.params.id);
 
-  if (!task) {
-    return notFoundResponse(res, req.params.id);
+    if (!task) {
+      return notFoundResponse(res, req.params.id);
+    }
+
+    await repo.pool.query('DELETE FROM tasks WHERE id = $1', [task.id]);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
   }
-
-  db.prepare('DELETE FROM tasks WHERE id = ?').run(task.id);
-  res.status(204).send();
 });
 
-app.get('/stats', (req, res) => {
-  const { total } = db.prepare('SELECT COUNT(*) AS total FROM tasks').get();
-  const { done } = db.prepare('SELECT COUNT(*) AS done FROM tasks WHERE done = 1').get();
+app.get('/stats', async (req, res, next) => {
+  try {
+    const { rows } = await repo.pool.query(
+      "SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE done)::int AS done FROM tasks"
+    );
+    const { total, done } = rows[0];
 
-  res.json({ total, done, open: total - done });
+    res.json({ total, done, open: total - done });
+  } catch (err) {
+    next(err);
+  }
 });
 
-app.post('/reset', (req, res) => {
-  const resetAll = db.transaction(() => {
-    db.prepare('DELETE FROM tasks').run();
-    const insert = db.prepare('INSERT INTO tasks (id, title, done) VALUES (?, ?, ?)');
-    sampleTasks.forEach((task) => insert.run(task.id, task.title, task.done));
-  });
+app.post('/reset', async (req, res, next) => {
+  try {
+    const client = await repo.pool.connect();
 
-  resetAll();
-  res.json(db.prepare('SELECT * FROM tasks ORDER BY id').all().map(toApiTask));
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM tasks');
+      await client.query('ALTER SEQUENCE tasks_id_seq RESTART WITH 1');
+
+      for (const task of sampleTasks) {
+        await client.query('INSERT INTO tasks (title, done) VALUES ($1, $2)', [task.title, task.done]);
+      }
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    const { rows } = await repo.pool.query('SELECT * FROM tasks ORDER BY id');
+    res.json(rows.map(toApiTask));
+  } catch (err) {
+    next(err);
+  }
 });
 
 repo.init()
