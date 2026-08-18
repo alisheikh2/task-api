@@ -3,12 +3,16 @@ const fs = require('fs');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
-// Opens (and creates if missing) tasks.db, creates the tasks table if it
-// doesn't exist, and seeds three example tasks only if the table is empty.
-const { db } = require('./db');
+require('dotenv').config();
+
+// Connects to Postgres using DATABASE_URL, creates the tasks table if
+// missing, and seeds three example tasks only if the table is empty.
+// Route bodies below still reference the old SQLite API for now — they
+// get migrated to this repository in the next stages.
+const repo = require('./db');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
@@ -299,6 +303,13 @@ app.post('/reset', (req, res) => {
   res.json(db.prepare('SELECT * FROM tasks ORDER BY id').all().map(toApiTask));
 });
 
-app.listen(PORT, () => {
-  console.log(`Task API running at http://localhost:${PORT}`);
-});
+repo.init()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Task API running at http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('Failed to initialize the database', err);
+    process.exit(1);
+  });
