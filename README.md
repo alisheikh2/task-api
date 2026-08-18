@@ -1,6 +1,37 @@
 # Task API
 
-A beginner-friendly CRUD API built for the FlyRank Backend Internship. It started as an in-memory list of tasks (Week 2) and now persists tasks in a SQLite database (Week 3, Assignment A2), while keeping the exact same endpoints and responses.
+A beginner-friendly CRUD API built for the FlyRank Backend Internship. It started as an in-memory list of tasks (Week 2), moved to a SQLite file (Week 3, A2), and now runs against a containerized PostgreSQL database (Week 1, A3) — with the exact same endpoints and responses at every stage. This is the same repository growing, not three separate projects.
+
+## Running the whole stack (A3 — recommended)
+
+One command starts both the API and its Postgres database:
+
+```bash
+cp .env.example .env
+docker compose up
+```
+
+The API is then available at `http://localhost:3000`. The `tasks` table and its three seed rows are created automatically on first boot. To stop everything: `docker compose down` (add `-v` if you also want to wipe the volume and start clean).
+
+Environment variables the app needs are documented in `.env.example` — copy it to `.env` and adjust if needed. Inside `compose.yaml`, the API reaches the database by its service name (`db`), not `localhost`.
+
+### Example request
+
+```bash
+curl -i http://localhost:3000/tasks
+```
+```
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+
+[{"id":1,"title":"Learn Express","done":false},{"id":2,"title":"Build a CRUD API","done":false},{"id":3,"title":"Read the assignment","done":true}]
+```
+
+### Data in Postgres
+
+![Postgres data](screenshots/postgres-data.png)
+
+*(Screenshot of `docker exec -it taskdb psql -U postgres -d tasks -c "SELECT * FROM tasks;"`, or the same query in a GUI like pgAdmin/DBeaver/TablePlus.)*
 
 ## Database (Week 1 A3 update — Postgres in Docker)
 
@@ -11,7 +42,9 @@ A beginner-friendly CRUD API built for the FlyRank Backend Internship. It starte
   ```
   This runs the official `postgres` image, names the container `taskdb`, sets a password and a `tasks` database, maps port 5432 to the host, and mounts a named volume (`taskdata`) so the data survives even if the container is removed and recreated.
 - **Look inside it:** `docker ps` to confirm it's running, then `docker exec -it taskdb psql -U postgres -d tasks` opens a `psql` prompt inside the container (`\dt` lists tables, `\q` quits).
-- **Secrets:** the connection string lives in a git-ignored `.env` file. `.env.example` is committed with the same keys and placeholder values so anyone cloning the repo knows what to set.
+- **Secrets:** the connection string lives in a git-ignored `.env` file. `.env.example` is committed with the same keys and placeholder values so anyone cloning the repo knows what to set. No password is ever hardcoded in the source.
+- **One command for the whole stack:** `compose.yaml` defines two services — `api` (built from the `Dockerfile`) and `db` (the official `postgres` image with a named volume). `docker compose up` starts both together; the API waits for the database's healthcheck before starting.
+- **Persistence proof:** created tasks, ran `docker compose down` then `docker compose up` again, and the tasks were still there — the named volume (`taskdata`) keeps Postgres's data outside the container's own lifecycle.
 
 ## Database (Week 3 update)
 
@@ -34,29 +67,32 @@ This returned the seeded "Read the assignment" task. Hitting `GET /tasks?done=tr
 
 ## Requirements
 
-* Node.js 18 or newer
-* npm
+* [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Podman) — recommended, runs the whole stack
+* Node.js 18+ and npm — only needed if running the app outside Docker
 
-## Installation
+## Installation & Run
 
+**With Docker (recommended, one command):**
 ```bash
-npm install
+cp .env.example .env
+docker compose up
 ```
 
-## Run
-
+**Without Docker** (Postgres already running locally on port 5432):
 ```bash
+npm install
+cp .env.example .env   # edit DATABASE_URL if your local Postgres differs
 npm start
 ```
 
-The hand-built API runs at `http://localhost:3000`.
+The API runs at `http://localhost:3000` either way.
 
 ## Endpoints
 
 |Method|Endpoint|Description|Success|Errors|
 |-|-|-|-|-|
 |GET|`/`|API information|200|—|
-|GET|`/health`|Health check|200|—|
+|GET|`/health`|Health check (also pings the database)|200|503|
 |GET|`/tasks`|List all tasks|200|—|
 |GET|`/tasks/:id`|Get one task|200|404|
 |POST|`/tasks`|Create a task|201|400|
@@ -133,9 +169,9 @@ The OpenAPI document is generated from the route comments with `swagger-jsdoc` w
 
 ![Swagger UI](screenshots/swagger.png)
 
-## Mortality experiment
+## Mortality experiment (database edition, optional)
 
-The tasks are stored only in memory, so creating a task and restarting the server removes that task. This happens because there is no database or file persistence yet; the assignment uses this limitation to prepare for database work in Week 3.
+Try it yourself: run Postgres without a volume (`docker run -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=tasks -p 5432:5432 -d postgres`, no `-v` flag), create a few tasks, then `docker rm -f` that container and start a fresh one — the tasks will be gone. A container's own filesystem dies with the container; a named volume is what keeps the database's files on disk independently of any one container's lifecycle, which is why `compose.yaml` mounts `taskdata:/var/lib/postgresql/data` for the `db` service instead.
 
 ## AI vs me
 
